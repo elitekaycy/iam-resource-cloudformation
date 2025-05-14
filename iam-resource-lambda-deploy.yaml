@@ -1,4 +1,4 @@
-template-file-path: iam-resource-lambda.yaml
+template-file-path: iam-resource-lab.yaml
 parameters:
   S3UserEmail: dicksonanyaele1234@gmail.com
   EC2UserEmail: dicksonanyaele1234@gmail.com

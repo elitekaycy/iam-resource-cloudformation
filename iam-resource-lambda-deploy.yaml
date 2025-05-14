@@ -1,0 +1,5 @@
+template-file-path: iam-resource-lambda.yaml
+parameters:
+  S3UserEmail: dicksonanyaele1234@gmail.com
+  EC2UserEmail: dicksonanyaele1234@gmail.com
+tags: {}

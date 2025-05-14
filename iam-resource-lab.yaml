@@ -101,7 +101,7 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: LambdaPermissions
+        - PolicyName: LambdaBasicExecution
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -113,20 +113,38 @@ Resources:
                 Resource: arn:aws:logs:*:*:*
               - Effect: Allow
                 Action:
-                  - secretsmanager:GetSecretValue
-                  - ssm:GetParameter
+                  - cloudtrail:LookupEvents
+                  - cloudtrail:GetTrailStatus
+                Resource: "*"              
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
                 Resource: "*"
-
+        - PolicyName: SecretsAndParametersAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !GetAtt TemporaryPassword.Arn
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: 
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/iam/users/s3-user/email"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/iam/users/ec2-user/email"
+     
   UserCreationLogger:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: IAMUserCreationLogger
-      Runtime: java11
+      Runtime: java17
       Handler: com.iam.IAMUserCreationLoggerHandler::handleRequest
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: iam-java-jar
-        S3Key: iam-java-1.0.jar 
+        S3Key: iam-java-1.0.0.jar 
       Timeout: 30
       MemorySize: 256
 

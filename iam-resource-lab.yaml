@@ -1,0 +1,165 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lab - Automating IAM Resources Creation'
+
+Parameters:
+  S3UserEmail:
+    Type: String
+    Description: Email address for S3 user
+  EC2UserEmail:
+    Type: String
+    Description: Email address for EC2 user
+
+
+Resources:
+  TemporaryPassword:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: iam-users-temporary-password
+      Description: Temporary password for all IAM users
+      GenerateSecretString:
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+        RequireEachIncludedType: true
+        GenerateStringKey: "password"
+        SecretStringTemplate: '{"username": "temp-user"}' 
+ 
+  S3ReadGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: S3ReadOnlyGroup
+      Policies:
+        - PolicyName: S3ReadAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:Get*
+                  - s3:List*
+                Resource: '*'
+
+  EC2ReadGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: EC2ReadOnlyGroup
+      Policies:
+        - PolicyName: EC2ReadAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:Describe*
+                  - ec2:Get*
+                Resource: '*'
+   
+  S3User:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: s3-user
+      Groups:
+        - !Ref S3ReadGroup
+      LoginProfile:
+        Password: !Sub '{{resolve:secretsmanager:${TemporaryPassword}:SecretString:password}}'
+        PasswordResetRequired: true
+       
+  EC2User:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: ec2-user
+      Groups:
+        - !Ref EC2ReadGroup
+      LoginProfile:
+        Password: !Sub '{{resolve:secretsmanager:${TemporaryPassword}:SecretString:password}}'
+        PasswordResetRequired: true
+
+  S3UserEmailParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /iam/users/s3-user/email
+      Type: String
+      Value: !Ref S3UserEmail
+
+  EC2UserEmailParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /iam/users/ec2-user/email
+      Type: String
+      Value: !Ref EC2UserEmail
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - ssm:GetParameter
+                Resource: "*"
+
+  UserCreationLogger:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: IAMUserCreationLogger
+      Runtime: java11
+      Handler: com.iam.IAMUserCreationLoggerHandler::handleRequest
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: iam-java-jar
+        S3Key: iam-java-1.0.jar 
+      Timeout: 30
+      MemorySize: 256
+
+  UserCreationEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: 'Trigger when new IAM user is created'
+      EventPattern:
+        source:
+          - aws.iam
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - iam.amazonaws.com
+          eventName:
+            - CreateUser
+      Targets:
+        - Arn: !GetAtt UserCreationLogger.Arn
+          Id: IAMUserCreationLambdaTarget
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt UserCreationLogger.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt UserCreationEventRule.Arn
+
+Outputs:
+  S3UserARN:
+    Description: ARN of the S3 user
+    Value: !GetAtt S3User.Arn
+  EC2UserARN:
+    Description: ARN of the EC2 user
+    Value: !GetAtt EC2User.Arn
+  TemporaryPasswordSecret:
+    Description: Secret containing temporary password
+    Value: !Ref TemporaryPassword

@@ -127,7 +127,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource: !GetAtt TemporaryPassword.Arn
+                Resource: !Ref TemporaryPassword
               - Effect: Allow
                 Action:
                   - ssm:GetParameter
@@ -144,7 +144,7 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: iam-java-jar
-        S3Key: iam-java-1.0.0.jar 
+        S3Key: iam-java-1.0.jar 
       Timeout: 30
       MemorySize: 256
 

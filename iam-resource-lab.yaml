@@ -127,7 +127,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource: !GetAtt TemporaryPassword.Arn
+                Resource: !Ref TemporaryPassword
               - Effect: Allow
                 Action:
                   - ssm:GetParameter

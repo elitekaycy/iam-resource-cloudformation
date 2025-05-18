@@ -1,9 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Lab - Automating IAM Resources Creation'
 
-Metadata:
-  ForceUpdate: "2025-05-13T12:00:00Z"
-
 Parameters:
   S3UserEmail:
     Type: String
